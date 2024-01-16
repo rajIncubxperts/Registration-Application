@@ -18,13 +18,14 @@ interface Country {
 }
 
 interface Student {
-  id?: string;
+  _id?: string;
   firstName: string;
   lastName: string;
   gender: string;
   dateOfBirth: Date | null;
   nationalityId: string;
   familyMembers: FamilyMember[];
+  status: string;
 }
 
 function Home() {
@@ -33,6 +34,7 @@ function Home() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>("User");
   const [countries, setCountries] = useState<Country[]>([]);
+  const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<FamilyMember[]>([]);
   const [formData, setFormData] = useState<Student>({
     firstName: "",
     lastName: "",
@@ -40,6 +42,7 @@ function Home() {
     dateOfBirth: null,
     nationalityId: "Select nationality",
     familyMembers: [],
+    status: "Pending",
   });
   const [showFamilyMemberForm, setShowFamilyMemberForm] = useState(false);
   const [submittedFamilyMembers, setSubmittedFamilyMembers] = useState<
@@ -56,17 +59,28 @@ function Home() {
       dateOfBirth: null,
       nationalityId: "Select nationality",
       familyMembers: [],
+      status: "",
     });
     setShowFamilyMemberForm(false);
   };
 
-  const openModal = () => setModalOpen(true);
+ // const openModal = () => setModalOpen(true);
+ const openModal = (student: Student) => {
+  setSelectedStudent(student);
+  //fetchFamilyMembers(student._id);
+  setModalOpen(true);
+};
 
   const closeModal = () => {
     setModalOpen(false);
     setSelectedStudent(null);
     resetForm();
   };
+
+  useEffect(() => {
+    fetchData();
+    fetchCountries();
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -76,11 +90,6 @@ function Home() {
       console.error("Error fetching data:", error);
     }
   };
-
-  useEffect(() => {
-    fetchData();
-    fetchCountries();
-  }, []);
 
   const fetchCountries = async () => {
     try {
@@ -93,8 +102,18 @@ function Home() {
     }
   };
 
+  const fetchFamilyMembers = async (studentId: string) => {
+    try {
+      const response = await get(`http://localhost:8200/api/students/${studentId}/FamilyMembers`);
+      setSelectedFamilyMembers(response?.data || []);
+    } catch (error) {
+      console.error("Error fetching family members:", error);
+    }
+  };
+  
+
   const handleDeleteStudent = async (studentId: string | undefined) => {
-    console.log("Student Delete Api >>>",studentId);
+    console.log("Student Delete Api >>>", studentId);
     try {
       if (!studentId) {
         console.error("Invalid student ID");
@@ -126,7 +145,6 @@ function Home() {
   };
 
   const handleAddEmployee = async () => {
-
     try {
       if (
         !formData.firstName ||
@@ -145,6 +163,7 @@ function Home() {
         gender: formData.gender,
         dateOfBirth: formData.dateOfBirth.toISOString().split("T")[0],
         nationalityId: formData.nationalityId,
+        ///status: "Pending",
       };
 
       // Step 2: Make the API call to register the student
@@ -172,7 +191,7 @@ function Home() {
       const familyMemberResponse = await fetch(
         `http://localhost:8200/api/students/${studentId}/FamilyMembers`,
         {
-          method: "POST",
+          method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
@@ -251,7 +270,37 @@ function Home() {
     updatedFamilyMembers.splice(index, 1);
     setSubmittedFamilyMembers(updatedFamilyMembers);
   };
-
+  const handleStatusChange = async (studentId: string | undefined, newStatus: string) => {
+    try {
+      if (!studentId) {
+        console.error("Invalid student ID");
+        return;
+      }
+  
+      const response = await fetch(
+        `http://localhost:8200/api/students/${studentId}/${newStatus}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+  
+      if (response.ok) {
+        console.log(`Student with ID ${studentId} status changed to ${newStatus} successfully!`);
+        fetchData();
+      } else {
+        console.error(
+          `Error changing status for student with ID ${studentId}:`,
+          response.statusText
+        );
+      }
+    } catch (error) {
+      console.error(`Error changing status for student with ID ${studentId}:`, error);
+    }
+  };
+  
   const renderFamilyMembers = () => {
     return (
       <>
@@ -271,8 +320,11 @@ function Home() {
                 <td>{index + 1}</td>
                 <td className="text-truncate">{familyMember.name}</td>
                 <td className="text-truncate">{familyMember.relation}</td>
-                <td className="text-truncate">{countries.find((country) => country._id === familyMember.nationalityId)?.countryName || ''}
-              </td>
+                <td className="text-truncate">
+                  {countries.find(
+                    (country) => country._id === familyMember.nationalityId
+                  )?.countryName || ""}
+                </td>
                 <td>
                   <Button
                     variant="danger"
@@ -362,7 +414,7 @@ function Home() {
           </div>
         )}
 
-        {!selectedStudent && !showFamilyMemberForm && (
+        {selectedStudent && !showFamilyMemberForm && (
           <Button variant="success" size="sm" onClick={handleAddFamilyMember}>
             Add Family Member
           </Button>
@@ -380,18 +432,43 @@ function Home() {
       selector: (row) => row.dateOfBirth,
       sortable: true,
     },
+    { 
+      name: "Status", 
+      selector: (row) => (
+        <span className={row.status === 'Accepted' ? 'text-success' : 'text-danger'}>
+          {row.status}
+        </span>
+      ), 
+      sortable: true,
+    },
     {
       name: "Actions",
       omit: selectedRole !== "Registrar",
       cell: (row) =>
         selectedRole === "Registrar" && (
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => handleDeleteStudent(row.id)}
-          >
-            Delete
-          </Button>
+          <>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleDeleteStudent(row._id)}
+            >
+              Delete
+            </Button>
+            <Button
+              variant="success"
+              size="sm"
+              onClick={() => handleStatusChange(row._id, "Accepted")}
+            >
+              Accept
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleStatusChange(row._id, "Rejected")}
+            >
+              Reject
+            </Button>
+          </>
         ),
     },
   ];
@@ -444,6 +521,7 @@ function Home() {
           pagination
           paginationPerPage={5}
           paginationRowsPerPageOptions={[5, 10, 20, 50]}
+         onRowClicked={(row) => openModal(row)}
         />
       </div>
       <CustomModal
