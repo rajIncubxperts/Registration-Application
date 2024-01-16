@@ -5,6 +5,7 @@ import { Form, Button, Table } from "react-bootstrap";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CustomModal from "../../components/modal";
+import moment from "moment";
 
 interface FamilyMember {
   name: string;
@@ -34,7 +35,9 @@ function Home() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>("User");
   const [countries, setCountries] = useState<Country[]>([]);
-  const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<FamilyMember[]>([]);
+  const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<
+    FamilyMember[]
+  >([]);
   const [formData, setFormData] = useState<Student>({
     firstName: "",
     lastName: "",
@@ -64,12 +67,18 @@ function Home() {
     setShowFamilyMemberForm(false);
   };
 
- // const openModal = () => setModalOpen(true);
- const openModal = (student: Student) => {
-  setSelectedStudent(student);
-  //fetchFamilyMembers(student._id);
-  setModalOpen(true);
-};
+  // const openModal = () => setModalOpen(true);
+  const openModal = (student: Student) => {
+    setSelectedStudent(student);
+    //fetchFamilyMembers(student._id);
+    setModalOpen(true);
+  };
+  
+  const editModal = (student: Student) => {
+   // setSelectedStudent(student);
+    fetchFamilyMembers(student);
+    setModalOpen(true);
+  };
 
   const closeModal = () => {
     setModalOpen(false);
@@ -102,15 +111,16 @@ function Home() {
     }
   };
 
-  const fetchFamilyMembers = async (studentId: string) => {
+  const fetchFamilyMembers = async (studentId: any) => {
     try {
-      const response = await get(`http://localhost:8200/api/students/${studentId}/FamilyMembers`);
+      const response = await get(
+        `http://localhost:8200/api/students/${studentId}/FamilyMembers`
+      );
       setSelectedFamilyMembers(response?.data || []);
     } catch (error) {
       console.error("Error fetching family members:", error);
     }
   };
-  
 
   const handleDeleteStudent = async (studentId: string | undefined) => {
     console.log("Student Delete Api >>>", studentId);
@@ -163,7 +173,6 @@ function Home() {
         gender: formData.gender,
         dateOfBirth: formData.dateOfBirth.toISOString().split("T")[0],
         nationalityId: formData.nationalityId,
-        ///status: "Pending",
       };
 
       // Step 2: Make the API call to register the student
@@ -185,9 +194,6 @@ function Home() {
 
       const { data } = await studentResponse.json();
       const studentId = data?._id;
-      console.log(studentId);
-
-      // Step 5: Make the API call to add the family member
       const familyMemberResponse = await fetch(
         `http://localhost:8200/api/students/${studentId}/FamilyMembers`,
         {
@@ -203,6 +209,7 @@ function Home() {
         console.log("Student and family member added successfully!");
         fetchData();
         closeModal();
+       // resetFamilyMemberForm();
       } else {
         console.error(
           "Error adding family member:",
@@ -265,18 +272,21 @@ function Home() {
     setFormData({ ...formData, familyMembers: updatedFamilyMembers });
   };
 
-  const handleDeleteFamilyMemberSubmit = (index) => {
+  const handleDeleteFamilyMemberSubmit = (index: number) => {
     const updatedFamilyMembers = [...submittedFamilyMembers];
     updatedFamilyMembers.splice(index, 1);
     setSubmittedFamilyMembers(updatedFamilyMembers);
   };
-  const handleStatusChange = async (studentId: string | undefined, newStatus: string) => {
+  const handleStatusChange = async (
+    studentId: string | undefined,
+    newStatus: string
+  ) => {
     try {
       if (!studentId) {
         console.error("Invalid student ID");
         return;
       }
-  
+
       const response = await fetch(
         `http://localhost:8200/api/students/${studentId}/${newStatus}`,
         {
@@ -286,9 +296,11 @@ function Home() {
           },
         }
       );
-  
+
       if (response.ok) {
-        console.log(`Student with ID ${studentId} status changed to ${newStatus} successfully!`);
+        console.log(
+          `Student with ID ${studentId} status changed to ${newStatus} successfully!`
+        );
         fetchData();
       } else {
         console.error(
@@ -297,10 +309,13 @@ function Home() {
         );
       }
     } catch (error) {
-      console.error(`Error changing status for student with ID ${studentId}:`, error);
+      console.error(
+        `Error changing status for student with ID ${studentId}:`,
+        error
+      );
     }
   };
-  
+
   const renderFamilyMembers = () => {
     return (
       <>
@@ -429,17 +444,20 @@ function Home() {
     { name: "Gender", selector: (row) => row.gender, sortable: true },
     {
       name: "Date of Birth",
-      selector: (row) => row.dateOfBirth,
+      selector: (row) => (row.dateOfBirth ? moment(row.dateOfBirth).format("DD-MM-YYYY") : ''),
       sortable: true,
     },
-    { 
-      name: "Status", 
-      selector: (row) => (
-        <span className={row.status === 'Accepted' ? 'text-success' : 'text-danger'}>
+    {
+      name: "Status",
+      selector: (row) => row.status,
+      sortable: true,
+      cell:(row) =>(
+        <span
+          className={row.status === "Accepted" ? "text-success" : "text-danger"}
+        >
           {row.status}
         </span>
-      ), 
-      sortable: true,
+      ),
     },
     {
       name: "Actions",
@@ -451,20 +469,25 @@ function Home() {
               variant="danger"
               size="sm"
               onClick={() => handleDeleteStudent(row._id)}
+              className="mx-1"
             >
               Delete
             </Button>
+
             <Button
               variant="success"
               size="sm"
               onClick={() => handleStatusChange(row._id, "Accepted")}
+              className="mx-1"
             >
               Accept
             </Button>
+
             <Button
               variant="danger"
               size="sm"
               onClick={() => handleStatusChange(row._id, "Rejected")}
+              className="mx-1"
             >
               Reject
             </Button>
@@ -521,7 +544,7 @@ function Home() {
           pagination
           paginationPerPage={5}
           paginationRowsPerPageOptions={[5, 10, 20, 50]}
-         onRowClicked={(row) => openModal(row)}
+          onRowClicked={(row) => editModal(row._id)}
         />
       </div>
       <CustomModal
