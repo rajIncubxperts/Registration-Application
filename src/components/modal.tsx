@@ -1,20 +1,30 @@
-import React, { useState, ReactNode } from 'react';
-import { Modal, Button, Form } from 'react-bootstrap';
+import React, { useState, ReactNode } from "react";
+import { Modal, Button, Form } from "react-bootstrap";
 
 interface CustomModalProps {
   isOpen: boolean;
   closeModal: () => void;
   title: string;
+  selectedFamilyMembers?: any;
   children: ReactNode;
   onConfirm: () => void;
+  action:string
 }
 
-const CustomModal: React.FC<CustomModalProps> = ({ isOpen, closeModal, title, children, onConfirm }) => {
+const CustomModal: React.FC<CustomModalProps> = ({
+  isOpen,
+  closeModal,
+  title,
+  children,
+  selectedFamilyMembers,
+  action,
+  onConfirm,
+}) => {
   const [validated, setValidated] = useState(false);
+  console.log("studentId", selectedFamilyMembers);
 
   const handleConfirm = () => {
     setValidated(true);
-    // Perform additional validation if needed
     if (!validated) return;
     onConfirm();
     closeModal();
@@ -32,7 +42,7 @@ const CustomModal: React.FC<CustomModalProps> = ({ isOpen, closeModal, title, ch
       </Modal.Body>
       <Modal.Footer>
         <Button variant="primary" onClick={handleConfirm}>
-          Confirm
+          {action === "add" ? "Update" : "Add"}
         </Button>
         <Button variant="secondary" onClick={closeModal}>
           Cancel
@@ -43,6 +53,3 @@ const CustomModal: React.FC<CustomModalProps> = ({ isOpen, closeModal, title, ch
 };
 
 export default CustomModal;
-
-
-

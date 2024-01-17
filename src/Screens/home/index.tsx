@@ -6,6 +6,9 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CustomModal from "../../components/modal";
 import moment from "moment";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTrash, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { BASE_URL } from "../../configuration/config";
 
 interface FamilyMember {
   name: string;
@@ -35,9 +38,8 @@ function Home() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>("User");
   const [countries, setCountries] = useState<Country[]>([]);
-  const [selectedFamilyMembers, setSelectedFamilyMembers] = useState<
-    FamilyMember[]
-  >([]);
+  const [studentId, setStudentID] = useState();
+  const [selectedFamilyMembers, setSelectedFamilyMembers] = useState([]);
   const [formData, setFormData] = useState<Student>({
     firstName: "",
     lastName: "",
@@ -67,18 +69,18 @@ function Home() {
     setShowFamilyMemberForm(false);
   };
 
-  // const openModal = () => setModalOpen(true);
   const openModal = (student: Student) => {
+    resetForm();
     setSelectedStudent(student);
-    //fetchFamilyMembers(student._id);
     setModalOpen(true);
   };
-  
+
   const editModal = (student: Student) => {
-   // setSelectedStudent(student);
-    fetchFamilyMembers(student);
+    setStudentID(student);
     setModalOpen(true);
   };
+
+  console.log('formData',formData)
 
   const closeModal = () => {
     setModalOpen(false);
@@ -91,9 +93,13 @@ function Home() {
     fetchCountries();
   }, []);
 
+  useEffect(() => {
+    studentId && fetchFamilyMembers(studentId);
+  }, [studentId]);
+
   const fetchData = async () => {
     try {
-      const response = await get("http://localhost:8200/api/students");
+      const response = await get(`${BASE_URL}/students`);
       setStudents(response?.data || []);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -103,7 +109,7 @@ function Home() {
   const fetchCountries = async () => {
     try {
       const countriesResponse = await get<{ data: Country[] }>(
-        "http://localhost:8200/api/students/countries"
+        `${BASE_URL}/students/countries`
       );
       setCountries(countriesResponse?.data || []);
     } catch (error) {
@@ -114,16 +120,16 @@ function Home() {
   const fetchFamilyMembers = async (studentId: any) => {
     try {
       const response = await get(
-        `http://localhost:8200/api/students/${studentId}/FamilyMembers`
+        `${BASE_URL}/students/${studentId}/FamilyMembers`
       );
-      setSelectedFamilyMembers(response?.data || []);
+      setFormData(response[0] || [])
+      setSubmittedFamilyMembers(response[0].foundRelations || []);
     } catch (error) {
       console.error("Error fetching family members:", error);
     }
   };
 
   const handleDeleteStudent = async (studentId: string | undefined) => {
-    console.log("Student Delete Api >>>", studentId);
     try {
       if (!studentId) {
         console.error("Invalid student ID");
@@ -131,7 +137,7 @@ function Home() {
       }
 
       const response = await fetch(
-        `http://localhost:8200/api/students/${studentId}`,
+        `${BASE_URL}/students/${studentId}`,
         {
           method: "DELETE",
           headers: {
@@ -177,7 +183,7 @@ function Home() {
 
       // Step 2: Make the API call to register the student
       const studentResponse = await fetch(
-        "http://localhost:8200/api/students",
+        `${BASE_URL}/students`,
         {
           method: "POST",
           headers: {
@@ -195,7 +201,7 @@ function Home() {
       const { data } = await studentResponse.json();
       const studentId = data?._id;
       const familyMemberResponse = await fetch(
-        `http://localhost:8200/api/students/${studentId}/FamilyMembers`,
+        `${BASE_URL}/students/${studentId}/FamilyMembers`,
         {
           method: "PUT",
           headers: {
@@ -209,7 +215,6 @@ function Home() {
         console.log("Student and family member added successfully!");
         fetchData();
         closeModal();
-       // resetFamilyMemberForm();
       } else {
         console.error(
           "Error adding family member:",
@@ -223,7 +228,6 @@ function Home() {
 
   const handleRoleChange = (role: string) => {
     setSelectedRole(role);
-    console.log("Selected Role:", role);
   };
 
   const handleDateInputChange = (date: Date | null) => {
@@ -288,7 +292,7 @@ function Home() {
       }
 
       const response = await fetch(
-        `http://localhost:8200/api/students/${studentId}/${newStatus}`,
+        `${BASE_URL}/students/${studentId}/${newStatus}`,
         {
           method: "POST",
           headers: {
@@ -319,8 +323,8 @@ function Home() {
   const renderFamilyMembers = () => {
     return (
       <>
-        {submittedFamilyMembers.map((familyMember, index) => (
           <Table striped bordered hover responsive>
+          {submittedFamilyMembers.length > 0 && (
             <thead>
               <tr>
                 <th>#</th>
@@ -330,7 +334,9 @@ function Home() {
                 <th>Action</th>
               </tr>
             </thead>
+            )}
             <tbody>
+            {submittedFamilyMembers.map((familyMember, index) => (
               <tr key={index}>
                 <td>{index + 1}</td>
                 <td className="text-truncate">{familyMember.name}</td>
@@ -350,9 +356,9 @@ function Home() {
                   </Button>
                 </td>
               </tr>
+            ))}
             </tbody>
           </Table>
-        ))}
 
         {showFamilyMemberForm && (
           <div className="mb-3">
@@ -444,14 +450,15 @@ function Home() {
     { name: "Gender", selector: (row) => row.gender, sortable: true },
     {
       name: "Date of Birth",
-      selector: (row) => (row.dateOfBirth ? moment(row.dateOfBirth).format("DD-MM-YYYY") : ''),
+      selector: (row) =>
+        row.dateOfBirth ? moment(row.dateOfBirth).format("DD-MM-YYYY") : "",
       sortable: true,
     },
     {
       name: "Status",
       selector: (row) => row.status,
       sortable: true,
-      cell:(row) =>(
+      cell: (row) => (
         <span
           className={row.status === "Accepted" ? "text-success" : "text-danger"}
         >
@@ -471,7 +478,7 @@ function Home() {
               onClick={() => handleDeleteStudent(row._id)}
               className="mx-1"
             >
-              Delete
+              <FontAwesomeIcon icon={faTrash}/>
             </Button>
 
             <Button
@@ -480,7 +487,7 @@ function Home() {
               onClick={() => handleStatusChange(row._id, "Accepted")}
               className="mx-1"
             >
-              Accept
+              <FontAwesomeIcon icon={faCheck}/>
             </Button>
 
             <Button
@@ -489,12 +496,13 @@ function Home() {
               onClick={() => handleStatusChange(row._id, "Rejected")}
               className="mx-1"
             >
-              Reject
+              <FontAwesomeIcon icon={faTimes}/>
             </Button>
           </>
         ),
     },
   ];
+  console.log("selectedFamilyMembers>>>",selectedFamilyMembers?._id)
 
   return (
     <>
@@ -548,17 +556,19 @@ function Home() {
         />
       </div>
       <CustomModal
+        selectedFamilyMembers={selectedFamilyMembers}
         isOpen={isModalOpen}
         closeModal={closeModal}
-        title={selectedStudent ? "Edit Student" : "Add Student"}
+        title={selectedStudent ? "Add Student" : "Update Student"}
         onConfirm={handleAddEmployee}
+        action={selectedStudent ? "update" : "add"}
       >
         <Form.Group controlId="formFirstName">
           <Form.Label>First Name</Form.Label>
           <Form.Control
             type="text"
+            value={ formData.firstName}
             placeholder="Enter first name"
-            value={formData.firstName}
             onChange={(e) =>
               setFormData({ ...formData, firstName: e.target.value })
             }
@@ -599,7 +609,11 @@ function Home() {
         <Form.Group controlId="formdateOfBirth">
           <Form.Label>Date of Birth</Form.Label>
           <DatePicker
-            selected={formData.dateOfBirth}
+            selected={
+              formData.dateOfBirth
+                ? moment(formData.dateOfBirth).toDate()
+                : null
+            }
             onChange={handleDateInputChange}
             dateFormat="dd/MM/yyyy"
             isClearable
@@ -607,12 +621,12 @@ function Home() {
             customInput={<Form.Control style={{ width: "465px" }} />}
           />
         </Form.Group>
-
         <Form.Group controlId="formNationality">
           <Form.Label>Nationality</Form.Label>
           <Form.Control
             as="select"
-            value={formData.nationalityId}
+            value={formData.nationalityId
+            }
             onChange={(e) =>
               setFormData({ ...formData, nationalityId: e.target.value })
             }
