@@ -11,6 +11,7 @@ import { faTrash, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { BASE_URL } from "../../configuration/config";
 
 interface FamilyMember {
+  _id?: string;
   name: string;
   relation: string;
   nationalityId: string;
@@ -49,12 +50,13 @@ function Home() {
     familyMembers: [],
     status: "Pending",
   });
-  const [showFamilyMemberForm, setShowFamilyMemberForm] = useState(false);
+  const [showFamilyMemberForm, setShowFamilyMemberForm] = useState(true);
   const [submittedFamilyMembers, setSubmittedFamilyMembers] = useState<
     FamilyMember[]
   >([]);
 
-  console.log(submittedFamilyMembers);
+  console.log('formData',formData)
+  console.log('showFamilyMemberForm',showFamilyMemberForm)
 
   const resetForm = () => {
     setFormData({
@@ -66,7 +68,7 @@ function Home() {
       familyMembers: [],
       status: "",
     });
-    setShowFamilyMemberForm(false);
+    setShowFamilyMemberForm(true);
   };
 
   const openModal = (student: Student) => {
@@ -123,9 +125,45 @@ function Home() {
         `${BASE_URL}/students/${studentId}/FamilyMembers`
       );
       setFormData(response[0] || [])
-      setSubmittedFamilyMembers(response[0].foundRelations || []);
+      setSubmittedFamilyMembers(response[0].familyMembers || []);
     } catch (error) {
       console.error("Error fetching family members:", error);
+    }
+  };
+
+  const handleDeleteFamilyMemberSubmit = (index: number) => {
+    const updatedFamilyMembers = [...submittedFamilyMembers];
+    updatedFamilyMembers.splice(index, 1);
+    setSubmittedFamilyMembers(updatedFamilyMembers);
+  };
+  const handleDeleteFamilyMember = async (index: number, familyMemberId: string | undefined) => {
+    try {
+      if (!familyMemberId) {
+        console.error("Invalid student ID");
+        return;
+      }
+
+      const response = await fetch(
+        `${BASE_URL}/familyMember/${familyMemberId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.ok) {
+        console.log(`Student with ID ${familyMemberId} deleted successfully!`);
+        handleDeleteFamilyMemberSubmit(index)
+      } else {
+        console.error(
+          `Error deleting student with ID ${familyMemberId}:`,
+          response.statusText
+        );
+      }
+    } catch (error) {
+      console.error(`Error deleting student with ID ${familyMemberId}:`, error);
     }
   };
 
@@ -171,13 +209,14 @@ function Home() {
         console.error("Please fill in all required fields.");
         return;
       }
-
+      console.log('formData',formData)
+      debugger
       // Step 1: Create the student request object
       const studentRequestBody = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         gender: formData.gender,
-        dateOfBirth: formData.dateOfBirth.toISOString().split("T")[0],
+        dateOfBirth: formData.dateOfBirth,
         nationalityId: formData.nationalityId,
       };
 
@@ -203,7 +242,7 @@ function Home() {
       const familyMemberResponse = await fetch(
         `${BASE_URL}/students/${studentId}/FamilyMembers`,
         {
-          method: "PUT",
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
@@ -238,11 +277,10 @@ function Home() {
     setFormData({
       ...formData,
       familyMembers: [
-        ...formData.familyMembers,
         { name: "", relation: "", nationalityId: "Select nationality" },
       ],
     });
-    setShowFamilyMemberForm(true);
+    setShowFamilyMemberForm(false);
   };
 
   const validateFamilyMember = (familyMember: FamilyMember) => {
@@ -258,7 +296,7 @@ function Home() {
       formData.familyMembers[formData.familyMembers.length - 1];
     if (validateFamilyMember(newFamilyMember)) {
       setSubmittedFamilyMembers([...submittedFamilyMembers, newFamilyMember]);
-      setShowFamilyMemberForm(false);
+      setShowFamilyMemberForm(true);
     } else {
       console.error(
         "Please fill in all required fields for the family member."
@@ -272,15 +310,17 @@ function Home() {
     value: string
   ) => {
     const updatedFamilyMembers = [...formData.familyMembers];
-    updatedFamilyMembers[index][field] = value;
-    setFormData({ ...formData, familyMembers: updatedFamilyMembers });
+    updatedFamilyMembers[index] = {
+      ...updatedFamilyMembers[index],
+      [field]: value,
+    };
+    setFormData((prevFormData) => ({
+      ...prevFormData,
+      familyMembers: updatedFamilyMembers,
+    }));
   };
+  
 
-  const handleDeleteFamilyMemberSubmit = (index: number) => {
-    const updatedFamilyMembers = [...submittedFamilyMembers];
-    updatedFamilyMembers.splice(index, 1);
-    setSubmittedFamilyMembers(updatedFamilyMembers);
-  };
   const handleStatusChange = async (
     studentId: string | undefined,
     newStatus: string
@@ -324,7 +364,7 @@ function Home() {
     return (
       <>
           <Table striped bordered hover responsive>
-          {submittedFamilyMembers.length > 0 && (
+        {submittedFamilyMembers && submittedFamilyMembers.length > 0 && (
             <thead>
               <tr>
                 <th>#</th>
@@ -350,9 +390,9 @@ function Home() {
                   <Button
                     variant="danger"
                     size="sm"
-                    onClick={() => handleDeleteFamilyMemberSubmit(index)}
+                   onClick={() => handleDeleteFamilyMember(index, familyMember._id)}
                   >
-                    Delete
+                     <FontAwesomeIcon icon={faTrash}/>
                   </Button>
                 </td>
               </tr>
@@ -360,13 +400,14 @@ function Home() {
             </tbody>
           </Table>
 
-        {showFamilyMemberForm && (
+        {!showFamilyMemberForm && (
           <div className="mb-3">
             <Form.Control
               type="text"
               placeholder="Enter name"
               value={
-                formData.familyMembers[formData.familyMembers.length - 1].name
+                formData.familyMembers[formData.familyMembers?.length - 1]
+                ?.name
               }
               onChange={(e) =>
                 handleFamilyMemberChange(
@@ -382,7 +423,7 @@ function Home() {
               as="select"
               value={
                 formData.familyMembers[formData.familyMembers.length - 1]
-                  .relation
+                  ?.relation
               }
               onChange={(e) =>
                 handleFamilyMemberChange(
@@ -404,7 +445,7 @@ function Home() {
               as="select"
               value={
                 formData.familyMembers[formData.familyMembers.length - 1]
-                  .nationalityId
+                  ?.nationalityId
               }
               onChange={(e) =>
                 handleFamilyMemberChange(
@@ -435,7 +476,7 @@ function Home() {
           </div>
         )}
 
-        {selectedStudent && !showFamilyMemberForm && (
+        { showFamilyMemberForm && (
           <Button variant="success" size="sm" onClick={handleAddFamilyMember}>
             Add Family Member
           </Button>
@@ -502,7 +543,7 @@ function Home() {
         ),
     },
   ];
-  console.log("selectedFamilyMembers>>>",selectedFamilyMembers?._id)
+
 
   return (
     <>
@@ -642,11 +683,8 @@ function Home() {
             ))}
           </Form.Control>
         </Form.Group>
-
         <hr className="my-4" />
-
         <h5>Family Information</h5>
-
         {renderFamilyMembers()}
       </CustomModal>
     </>
