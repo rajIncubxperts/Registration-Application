@@ -1,4 +1,3 @@
-
 import axios, { AxiosResponse, AxiosError } from "axios";
 import ApiError from "../interface/api";
 import { BASE_URL } from "../configuration/config";
@@ -6,21 +5,6 @@ import { BASE_URL } from "../configuration/config";
 export const axiosApi = axios.create({
   baseURL: BASE_URL,
 });
-
-axiosApi.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    config.headers["Access-Control-Allow-Origin"] = "*";
-    config.headers["accept"] = "*/*";
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
 
 axiosApi.interceptors.response.use(
   (response: AxiosResponse) => {

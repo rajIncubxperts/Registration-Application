@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { get } from "../../helpers/apiHelper";
 import DataTable, { TableColumn } from "react-data-table-component";
 import { Form, Button, Table } from "react-bootstrap";
 import DatePicker from "react-datepicker";
@@ -9,29 +8,9 @@ import moment from "moment";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { BASE_URL } from "../../configuration/config";
-
-interface FamilyMember {
-  _id?: string;
-  name: string;
-  relation: string;
-  nationalityId: string;
-}
-
-interface Country {
-  _id: string;
-  countryName: string;
-}
-
-interface Student {
-  _id?: string;
-  firstName: string;
-  lastName: string;
-  gender: string;
-  dateOfBirth: Date | null;
-  nationalityId: string;
-  familyMembers: FamilyMember[];
-  status: string;
-}
+import { Relationship } from "../../constants/enum";
+import { FamilyMember, Country, Student } from "../../interface/types";
+import { get, del, post } from "../../helpers/apiHelper";
 
 function Home() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -40,7 +19,6 @@ function Home() {
   const [selectedRole, setSelectedRole] = useState<string>("User");
   const [countries, setCountries] = useState<Country[]>([]);
   const [studentId, setStudentID] = useState();
-  const [selectedFamilyMembers, setSelectedFamilyMembers] = useState([]);
   const [formData, setFormData] = useState<Student>({
     firstName: "",
     lastName: "",
@@ -54,9 +32,6 @@ function Home() {
   const [submittedFamilyMembers, setSubmittedFamilyMembers] = useState<
     FamilyMember[]
   >([]);
-
-  console.log('formData',formData)
-  console.log('showFamilyMemberForm',showFamilyMemberForm)
 
   const resetForm = () => {
     setFormData({
@@ -82,8 +57,6 @@ function Home() {
     setModalOpen(true);
   };
 
-  console.log('formData',formData)
-
   const closeModal = () => {
     setModalOpen(false);
     setSelectedStudent(null);
@@ -101,7 +74,7 @@ function Home() {
 
   const fetchData = async () => {
     try {
-      const response = await get(`${BASE_URL}/students`);
+      const response = await get("/students");
       setStudents(response?.data || []);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -110,21 +83,17 @@ function Home() {
 
   const fetchCountries = async () => {
     try {
-      const countriesResponse = await get<{ data: Country[] }>(
-        `${BASE_URL}/students/countries`
-      );
+      const countriesResponse = await get("/students/countries");
       setCountries(countriesResponse?.data || []);
     } catch (error) {
       console.error("Error fetching countries:", error);
     }
   };
 
-  const fetchFamilyMembers = async (studentId: any) => {
+  const fetchFamilyMembers = async (studentId: string) => {
     try {
-      const response = await get(
-        `${BASE_URL}/students/${studentId}/FamilyMembers`
-      );
-      setFormData(response[0] || [])
+      const response = await get(`/students/${studentId}/FamilyMembers`);
+      setFormData(response[0] || []);
       setSubmittedFamilyMembers(response[0].familyMembers || []);
     } catch (error) {
       console.error("Error fetching family members:", error);
@@ -136,34 +105,27 @@ function Home() {
     updatedFamilyMembers.splice(index, 1);
     setSubmittedFamilyMembers(updatedFamilyMembers);
   };
-  const handleDeleteFamilyMember = async (index: number, familyMemberId: string | undefined) => {
+
+  const handleDeleteFamilyMember = async (
+    index: number,
+    familyMemberId: string | undefined
+  ) => {
     try {
       if (!familyMemberId) {
-        console.error("Invalid student ID");
+        console.error("Invalid family member ID");
         return;
       }
 
-      const response = await fetch(
-        `${BASE_URL}/familyMember/${familyMemberId}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+      await del(`/familyMember/${familyMemberId}`);
+      console.log(
+        `Family member with ID ${familyMemberId} deleted successfully!`
       );
-
-      if (response.ok) {
-        console.log(`Student with ID ${familyMemberId} deleted successfully!`);
-        handleDeleteFamilyMemberSubmit(index)
-      } else {
-        console.error(
-          `Error deleting student with ID ${familyMemberId}:`,
-          response.statusText
-        );
-      }
+      handleDeleteFamilyMemberSubmit(index);
     } catch (error) {
-      console.error(`Error deleting student with ID ${familyMemberId}:`, error);
+      console.error(
+        `Error deleting family member with ID ${familyMemberId}:`,
+        error
+      );
     }
   };
 
@@ -174,15 +136,12 @@ function Home() {
         return;
       }
 
-      const response = await fetch(
-        `${BASE_URL}/students/${studentId}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await fetch(`${BASE_URL}/students/${studentId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
       if (response.ok) {
         console.log(`Student with ID ${studentId} deleted successfully!`);
@@ -209,9 +168,6 @@ function Home() {
         console.error("Please fill in all required fields.");
         return;
       }
-      console.log('formData',formData)
-      debugger
-      // Step 1: Create the student request object
       const studentRequestBody = {
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -219,47 +175,15 @@ function Home() {
         dateOfBirth: formData.dateOfBirth,
         nationalityId: formData.nationalityId,
       };
-
-      // Step 2: Make the API call to register the student
-      const studentResponse = await fetch(
-        `${BASE_URL}/students`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(studentRequestBody),
-        }
-      );
-
-      if (!studentResponse.ok) {
-        console.error("Error adding student:", studentResponse.statusText);
-        return;
-      }
-
-      const { data } = await studentResponse.json();
+      const { data } = await post("/students", studentRequestBody);
       const studentId = data?._id;
-      const familyMemberResponse = await fetch(
-        `${BASE_URL}/students/${studentId}/FamilyMembers`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(submittedFamilyMembers),
-        }
+      await post(
+        `/students/${studentId}/FamilyMembers`,
+        submittedFamilyMembers
       );
-
-      if (familyMemberResponse.ok) {
-        console.log("Student and family member added successfully!");
-        fetchData();
-        closeModal();
-      } else {
-        console.error(
-          "Error adding family member:",
-          familyMemberResponse.statusText
-        );
-      }
+      console.log("Student and family member added successfully!");
+      fetchData();
+      closeModal();
     } catch (error) {
       console.error("Error adding student and family member:", error);
     }
@@ -319,7 +243,6 @@ function Home() {
       familyMembers: updatedFamilyMembers,
     }));
   };
-  
 
   const handleStatusChange = async (
     studentId: string | undefined,
@@ -331,27 +254,8 @@ function Home() {
         return;
       }
 
-      const response = await fetch(
-        `${BASE_URL}/students/${studentId}/${newStatus}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (response.ok) {
-        console.log(
-          `Student with ID ${studentId} status changed to ${newStatus} successfully!`
-        );
-        fetchData();
-      } else {
-        console.error(
-          `Error changing status for student with ID ${studentId}:`,
-          response.statusText
-        );
-      }
+      await post<Student>(`${BASE_URL}/students/${studentId}/${newStatus}`, {});
+      fetchData();
     } catch (error) {
       console.error(
         `Error changing status for student with ID ${studentId}:`,
@@ -363,8 +267,8 @@ function Home() {
   const renderFamilyMembers = () => {
     return (
       <>
-          <Table striped bordered hover responsive>
-        {submittedFamilyMembers && submittedFamilyMembers.length > 0 && (
+        <Table striped bordered hover responsive>
+          {submittedFamilyMembers && submittedFamilyMembers.length > 0 && (
             <thead>
               <tr>
                 <th>#</th>
@@ -374,8 +278,8 @@ function Home() {
                 <th>Action</th>
               </tr>
             </thead>
-            )}
-            <tbody>
+          )}
+          <tbody>
             {submittedFamilyMembers.map((familyMember, index) => (
               <tr key={index}>
                 <td>{index + 1}</td>
@@ -390,15 +294,17 @@ function Home() {
                   <Button
                     variant="danger"
                     size="sm"
-                   onClick={() => handleDeleteFamilyMember(index, familyMember._id)}
+                    onClick={() =>
+                      handleDeleteFamilyMember(index, familyMember._id)
+                    }
                   >
-                     <FontAwesomeIcon icon={faTrash}/>
+                    <FontAwesomeIcon icon={faTrash} />
                   </Button>
                 </td>
               </tr>
             ))}
-            </tbody>
-          </Table>
+          </tbody>
+        </Table>
 
         {!showFamilyMemberForm && (
           <div className="mb-3">
@@ -406,8 +312,7 @@ function Home() {
               type="text"
               placeholder="Enter name"
               value={
-                formData.familyMembers[formData.familyMembers?.length - 1]
-                ?.name
+                formData.familyMembers[formData.familyMembers?.length - 1]?.name
               }
               onChange={(e) =>
                 handleFamilyMemberChange(
@@ -436,10 +341,11 @@ function Home() {
               required
             >
               <option value="">Select relationship</option>
-              <option value="Father">Father</option>
-              <option value="Mother">Mother</option>
-              <option value="Mother">Uncle</option>
-              <option value="Sibling">Sibling</option>
+              {Object.values(Relationship).map((relation) => (
+                <option key={relation} value={relation}>
+                  {relation}
+                </option>
+              ))}
             </Form.Control>
             <Form.Control
               as="select"
@@ -476,7 +382,7 @@ function Home() {
           </div>
         )}
 
-        { showFamilyMemberForm && (
+        {showFamilyMemberForm && (
           <Button variant="success" size="sm" onClick={handleAddFamilyMember}>
             Add Family Member
           </Button>
@@ -519,7 +425,7 @@ function Home() {
               onClick={() => handleDeleteStudent(row._id)}
               className="mx-1"
             >
-              <FontAwesomeIcon icon={faTrash}/>
+              <FontAwesomeIcon icon={faTrash} />
             </Button>
 
             <Button
@@ -528,7 +434,7 @@ function Home() {
               onClick={() => handleStatusChange(row._id, "Accepted")}
               className="mx-1"
             >
-              <FontAwesomeIcon icon={faCheck}/>
+              <FontAwesomeIcon icon={faCheck} />
             </Button>
 
             <Button
@@ -537,13 +443,12 @@ function Home() {
               onClick={() => handleStatusChange(row._id, "Rejected")}
               className="mx-1"
             >
-              <FontAwesomeIcon icon={faTimes}/>
+              <FontAwesomeIcon icon={faTimes} />
             </Button>
           </>
         ),
     },
   ];
-
 
   return (
     <>
@@ -597,7 +502,6 @@ function Home() {
         />
       </div>
       <CustomModal
-        selectedFamilyMembers={selectedFamilyMembers}
         isOpen={isModalOpen}
         closeModal={closeModal}
         title={selectedStudent ? "Add Student" : "Update Student"}
@@ -608,7 +512,7 @@ function Home() {
           <Form.Label>First Name</Form.Label>
           <Form.Control
             type="text"
-            value={ formData.firstName}
+            value={formData.firstName}
             placeholder="Enter first name"
             onChange={(e) =>
               setFormData({ ...formData, firstName: e.target.value })
@@ -666,8 +570,7 @@ function Home() {
           <Form.Label>Nationality</Form.Label>
           <Form.Control
             as="select"
-            value={formData.nationalityId
-            }
+            value={formData.nationalityId}
             onChange={(e) =>
               setFormData({ ...formData, nationalityId: e.target.value })
             }
