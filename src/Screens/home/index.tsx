@@ -10,12 +10,15 @@ import { faTrash, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { BASE_URL } from "../../configuration/config";
 import { Relationship } from "../../constants/enum";
 import { FamilyMember, Country, Student } from "../../interface/types";
-import { get, del, post } from "../../helpers/apiHelper";
+import { get, del, post, put } from "../../helpers/apiHelper";
 
 function Home() {
   const [students, setStudents] = useState<Student[]>([]);
   const [isModalOpen, setModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedFamilyMemberIndex, setSelectedFamilyMemberIndex] = useState<
+    number | null
+  >(null);
   const [selectedRole, setSelectedRole] = useState<string>("User");
   const [countries, setCountries] = useState<Country[]>([]);
   const [studentId, setStudentID] = useState();
@@ -33,6 +36,19 @@ function Home() {
     FamilyMember[]
   >([]);
 
+  // const resetFamilyMemberForm = () => {
+  //   setFormData((prevFormData) => ({
+  //     ...prevFormData,
+  //     familyMembers: [{
+  //       name: "",
+  //       relation: "",
+  //       nationalityId: "Select nationality"
+  //     }],
+  //   }));
+  //   setShowFamilyMemberForm(true);
+  //   setSelectedFamilyMemberIndex(null);
+  // };
+
   const resetForm = () => {
     setFormData({
       firstName: "",
@@ -44,12 +60,13 @@ function Home() {
       status: "",
     });
     setShowFamilyMemberForm(true);
+    //resetFamilyMemberForm
   };
 
   const openModal = (student: Student) => {
-    resetForm();
     setSelectedStudent(student);
     setModalOpen(true);
+    resetForm();
   };
 
   const editModal = (student: Student) => {
@@ -112,6 +129,7 @@ function Home() {
   ) => {
     try {
       if (!familyMemberId) {
+        handleDeleteFamilyMemberSubmit(index);
         console.error("Invalid family member ID");
         return;
       }
@@ -156,8 +174,59 @@ function Home() {
       console.error(`Error deleting student with ID ${studentId}:`, error);
     }
   };
+  const handleConfirmAction = async () => {
+    if (selectedStudent) {
+      await handleAddStudent();
+    } else {
+      await handleUpdateStudent();
+    }
+  };
 
-  const handleAddEmployee = async () => {
+  const handleUpdateStudent = async () => {
+    try {
+      if (!studentId) {
+        console.error("Invalid student ID");
+        return;
+      }
+      const updateRequestBody = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        gender: formData.gender,
+        dateOfBirth: formData.dateOfBirth,
+        nationalityId: formData.nationalityId,
+      };
+
+      await put(`/students/${studentId}`, updateRequestBody);
+
+      const updatedFamilyMembers = await Promise.all(
+        submittedFamilyMembers.map(async (familyMember) => {
+          const familyMemberUpdateRequestBody = {
+            name: familyMember.name,
+            relation: familyMember.relation,
+            nationalityId: familyMember.nationalityId,
+          };
+
+          const response = await put(
+            `/familyMember/${familyMember._id}`,
+            familyMemberUpdateRequestBody
+          );
+          console.log(
+            `Family member with ID ${familyMember._id} updated successfully!`
+          );
+
+          return response.data;
+        })
+      );
+
+      setSubmittedFamilyMembers(updatedFamilyMembers);
+      fetchData();
+      closeModal();
+    } catch (error) {
+      console.error("Error updating student:", error);
+    }
+  };
+
+  const handleAddStudent = async () => {
     try {
       if (
         !formData.firstName ||
@@ -215,16 +284,37 @@ function Home() {
     );
   };
 
+  // Update the form data with the selected family member
+  const handleRowClick = (index: number) => {
+    setSelectedFamilyMemberIndex(index);
+    const selectedFamilyMember = submittedFamilyMembers[index];
+    setFormData({
+      ...formData,
+      familyMembers: [selectedFamilyMember],
+    });
+    setShowFamilyMemberForm(false);
+  };
+
   const handleSubmitFamilyMember = () => {
-    const newFamilyMember =
-      formData.familyMembers[formData.familyMembers.length - 1];
-    if (validateFamilyMember(newFamilyMember)) {
-      setSubmittedFamilyMembers([...submittedFamilyMembers, newFamilyMember]);
+    if (selectedFamilyMemberIndex !== null) {
+      // If checkbox is checked, update existing family member
+      const updatedFamilyMembers = [...submittedFamilyMembers];
+      updatedFamilyMembers[selectedFamilyMemberIndex] =
+        formData.familyMembers[0];
+      setSubmittedFamilyMembers(updatedFamilyMembers);
       setShowFamilyMemberForm(true);
+      setSelectedFamilyMemberIndex(null);
     } else {
-      console.error(
-        "Please fill in all required fields for the family member."
-      );
+      // If checkbox is not checked, add a new family member
+      const newFamilyMember = formData.familyMembers[0];
+      if (validateFamilyMember(newFamilyMember)) {
+        setSubmittedFamilyMembers([...submittedFamilyMembers, newFamilyMember]);
+        setShowFamilyMemberForm(true);
+      } else {
+        console.error(
+          "Please fill in all required fields for the family member."
+        );
+      }
     }
   };
 
@@ -264,9 +354,11 @@ function Home() {
     }
   };
 
+
   const renderFamilyMembers = () => {
     return (
       <>
+
         <Table striped bordered hover responsive>
           {submittedFamilyMembers && submittedFamilyMembers.length > 0 && (
             <thead>
@@ -276,10 +368,11 @@ function Home() {
                 <th>Relationship</th>
                 <th>Nationality</th>
                 <th>Action</th>
+                <th>Edit</th>
               </tr>
             </thead>
           )}
-          <tbody>
+          {/* <tbody>
             {submittedFamilyMembers.map((familyMember, index) => (
               <tr key={index}>
                 <td>{index + 1}</td>
@@ -303,8 +396,41 @@ function Home() {
                 </td>
               </tr>
             ))}
+          </tbody> */}
+          <tbody>
+            {submittedFamilyMembers.map((familyMember, index) => (
+              <tr key={index} style={{ cursor: "pointer" }}>
+                <td>{index + 1}</td>
+                <td className="text-truncate">{familyMember.name}</td>
+                <td className="text-truncate">{familyMember.relation}</td>
+                <td className="text-truncate">
+                  {countries.find(
+                    (country) => country._id === familyMember.nationalityId
+                  )?.countryName || ""}
+                </td>
+                <td>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() =>
+                      handleDeleteFamilyMember(index, familyMember._id)
+                    }
+                  >
+                    <FontAwesomeIcon icon={faTrash} />
+                  </Button>
+                </td>
+                <td>
+                  <Form.Check
+                    type="checkbox"
+                    checked={selectedFamilyMemberIndex === index}
+                    onChange={() => handleRowClick(index)}
+                  />
+                </td>
+              </tr>
+            ))}
           </tbody>
         </Table>
+      
 
         {!showFamilyMemberForm && (
           <div className="mb-3">
@@ -382,7 +508,7 @@ function Home() {
           </div>
         )}
 
-        {showFamilyMemberForm && (
+        {showFamilyMemberForm && !studentId &&(
           <Button variant="success" size="sm" onClick={handleAddFamilyMember}>
             Add Family Member
           </Button>
@@ -505,7 +631,7 @@ function Home() {
         isOpen={isModalOpen}
         closeModal={closeModal}
         title={selectedStudent ? "Add Student" : "Update Student"}
-        onConfirm={handleAddEmployee}
+        onConfirm={handleConfirmAction}
         action={selectedStudent ? "update" : "add"}
       >
         <Form.Group controlId="formFirstName">
@@ -566,6 +692,7 @@ function Home() {
             customInput={<Form.Control style={{ width: "465px" }} />}
           />
         </Form.Group>
+
         <Form.Group controlId="formNationality">
           <Form.Label>Nationality</Form.Label>
           <Form.Control
@@ -586,6 +713,7 @@ function Home() {
             ))}
           </Form.Control>
         </Form.Group>
+
         <hr className="my-4" />
         <h5>Family Information</h5>
         {renderFamilyMembers()}
