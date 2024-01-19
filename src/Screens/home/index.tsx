@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import DataTable, { TableColumn } from "react-data-table-component";
 import { Form, Button, Table } from "react-bootstrap";
 import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 import CustomModal from "../../components/modal";
 import moment from "moment";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -11,6 +10,9 @@ import { BASE_URL } from "../../configuration/config";
 import { Relationship } from "../../constants/enum";
 import { FamilyMember, Country, Student } from "../../interface/types";
 import { get, del, post, put } from "../../helpers/apiHelper";
+import { ToastContainer, toast } from 'react-toastify';
+
+
 
 function Home() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -36,19 +38,6 @@ function Home() {
     FamilyMember[]
   >([]);
 
-  // const resetFamilyMemberForm = () => {
-  //   setFormData((prevFormData) => ({
-  //     ...prevFormData,
-  //     familyMembers: [{
-  //       name: "",
-  //       relation: "",
-  //       nationalityId: "Select nationality"
-  //     }],
-  //   }));
-  //   setShowFamilyMemberForm(true);
-  //   setSelectedFamilyMemberIndex(null);
-  // };
-
   const resetForm = () => {
     setFormData({
       firstName: "",
@@ -60,7 +49,7 @@ function Home() {
       status: "",
     });
     setShowFamilyMemberForm(true);
-    //resetFamilyMemberForm
+    setSubmittedFamilyMembers([]);
   };
 
   const openModal = (student: Student) => {
@@ -71,6 +60,7 @@ function Home() {
 
   const editModal = (student: Student) => {
     setStudentID(student);
+    fetchFamilyMembers(`${student}`);
     setModalOpen(true);
   };
 
@@ -84,10 +74,6 @@ function Home() {
     fetchData();
     fetchCountries();
   }, []);
-
-  useEffect(() => {
-    studentId && fetchFamilyMembers(studentId);
-  }, [studentId]);
 
   const fetchData = async () => {
     try {
@@ -133,17 +119,15 @@ function Home() {
         console.error("Invalid family member ID");
         return;
       }
-
       await del(`/familyMember/${familyMemberId}`);
-      console.log(
-        `Family member with ID ${familyMemberId} deleted successfully!`
-      );
+      toast.success("Family member deleted successfully!");
       handleDeleteFamilyMemberSubmit(index);
     } catch (error) {
       console.error(
         `Error deleting family member with ID ${familyMemberId}:`,
         error
       );
+      toast.error("Error deleting family member. Please try again.");
     }
   };
 
@@ -162,18 +146,21 @@ function Home() {
       });
 
       if (response.ok) {
-        console.log(`Student with ID ${studentId} deleted successfully!`);
         fetchData();
+        toast.success("Student deleted successfully!:");
       } else {
         console.error(
           `Error deleting student with ID ${studentId}:`,
           response.statusText
         );
+        toast.error("Error deleting student. Please try again.");
       }
     } catch (error) {
       console.error(`Error deleting student with ID ${studentId}:`, error);
+      toast.error("Error deleting student. Please try again.");
     }
   };
+
   const handleConfirmAction = async () => {
     if (selectedStudent) {
       await handleAddStudent();
@@ -185,7 +172,6 @@ function Home() {
   const handleUpdateStudent = async () => {
     try {
       if (!studentId) {
-        console.error("Invalid student ID");
         return;
       }
       const updateRequestBody = {
@@ -217,12 +203,16 @@ function Home() {
           return response.data;
         })
       );
-
+      
+      fetchFamilyMembers(studentId);
       setSubmittedFamilyMembers(updatedFamilyMembers);
       fetchData();
       closeModal();
+      toast.success('Student details member Updated successfully!');
     } catch (error) {
-      console.error("Error updating student:", error);
+     console.error("Error updating student:", error);
+     toast.error("Error updating student:" + error);
+
     }
   };
 
@@ -234,7 +224,7 @@ function Home() {
         !formData.gender ||
         !formData.dateOfBirth
       ) {
-        console.error("Please fill in all required fields.");
+        toast.error("Please fill in all required fields.");
         return;
       }
       const studentRequestBody = {
@@ -250,11 +240,11 @@ function Home() {
         `/students/${studentId}/FamilyMembers`,
         submittedFamilyMembers
       );
-      console.log("Student and family member added successfully!");
+      toast.success('Student details added successfully!');
       fetchData();
       closeModal();
     } catch (error) {
-      console.error("Error adding student and family member:", error);
+      toast.error("Error adding student and family member:" + error);
     }
   };
 
@@ -311,9 +301,7 @@ function Home() {
         setSubmittedFamilyMembers([...submittedFamilyMembers, newFamilyMember]);
         setShowFamilyMemberForm(true);
       } else {
-        console.error(
-          "Please fill in all required fields for the family member."
-        );
+        toast.error("Please fill in all required fields for the family member.");
       }
     }
   };
@@ -354,11 +342,9 @@ function Home() {
     }
   };
 
-
   const renderFamilyMembers = () => {
     return (
       <>
-
         <Table striped bordered hover responsive>
           {submittedFamilyMembers && submittedFamilyMembers.length > 0 && (
             <thead>
@@ -372,31 +358,6 @@ function Home() {
               </tr>
             </thead>
           )}
-          {/* <tbody>
-            {submittedFamilyMembers.map((familyMember, index) => (
-              <tr key={index}>
-                <td>{index + 1}</td>
-                <td className="text-truncate">{familyMember.name}</td>
-                <td className="text-truncate">{familyMember.relation}</td>
-                <td className="text-truncate">
-                  {countries.find(
-                    (country) => country._id === familyMember.nationalityId
-                  )?.countryName || ""}
-                </td>
-                <td>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() =>
-                      handleDeleteFamilyMember(index, familyMember._id)
-                    }
-                  >
-                    <FontAwesomeIcon icon={faTrash} />
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody> */}
           <tbody>
             {submittedFamilyMembers.map((familyMember, index) => (
               <tr key={index} style={{ cursor: "pointer" }}>
@@ -430,7 +391,6 @@ function Home() {
             ))}
           </tbody>
         </Table>
-      
 
         {!showFamilyMemberForm && (
           <div className="mb-3">
@@ -508,7 +468,7 @@ function Home() {
           </div>
         )}
 
-        {showFamilyMemberForm && !studentId &&(
+        {showFamilyMemberForm && (
           <Button variant="success" size="sm" onClick={handleAddFamilyMember}>
             Add Family Member
           </Button>
@@ -578,6 +538,7 @@ function Home() {
 
   return (
     <>
+     <ToastContainer />
       <div
         style={{
           display: "flex",
