@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 import DataTable, { TableColumn } from "react-data-table-component";
 import { Form, Button, Table } from "react-bootstrap";
 import DatePicker from "react-datepicker";
@@ -35,9 +35,14 @@ function Home() {
   const [submittedFamilyMembers, setSubmittedFamilyMembers] = useState<
     FamilyMember[]
   >([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const isAdminStaff = selectedRole === "Admin Staff";
   const isUser = selectedRole === "User";
+
+  const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
 
   const resetForm = () => {
     setFormData({
@@ -68,18 +73,24 @@ function Home() {
   const closeModal = () => {
     setModalOpen(false);
     setSelectedStudent(null);
-    // resetForm();
   };
 
   useEffect(() => {
     fetchData();
     fetchCountries();
-  }, []);
+  }, [searchTerm]);
 
   const fetchData = async () => {
     try {
       const response = await get("/students");
-      setStudents(response?.data || []);
+      // Filter students based on the search input
+      const filteredStudents = response?.data.filter((student: Student) =>
+        Object.values(student)
+          .join(" ")
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase())
+      );
+      setStudents(filteredStudents || []);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
@@ -477,8 +488,8 @@ function Home() {
           </div>
         )}
 
-        {!formData._id && showFamilyMemberForm &&(
-          <Button variant="success" size="sm" onClick={handleAddFamilyMember} >
+        {!formData._id && showFamilyMemberForm && (
+          <Button variant="success" size="sm" onClick={handleAddFamilyMember}>
             Add Family Member
           </Button>
         )}
@@ -490,6 +501,13 @@ function Home() {
     { name: "First Name", selector: (row) => row.firstName, sortable: true },
     { name: "Last Name", selector: (row) => row.lastName, sortable: true },
     { name: "Gender", selector: (row) => row.gender, sortable: true },
+    {
+      name: "Nationality",
+      selector: (row) =>
+        countries.find((country) => country._id === row.nationalityId)
+          ?.countryName || "",
+      sortable: true,
+    },
     {
       name: "Date of Birth",
       selector: (row) =>
@@ -585,6 +603,13 @@ function Home() {
             alignItems: "center",
           }}
         >
+          <Form.Control
+            type="text"
+            placeholder="Search"
+            value={searchTerm}
+            onChange={handleSearchChange}
+            style={{ marginRight: "10px" }}
+          />
           <Form.Select
             //variant="success"
             value={selectedRole}
