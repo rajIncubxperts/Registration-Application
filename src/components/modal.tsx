@@ -8,7 +8,8 @@ interface CustomModalProps {
   selectedFamilyMembers?: any;
   children: ReactNode;
   onConfirm: () => void;
-  action:string
+  action: string;
+  isAdminStaff: boolean;
 }
 
 const CustomModal: React.FC<CustomModalProps> = ({
@@ -19,9 +20,9 @@ const CustomModal: React.FC<CustomModalProps> = ({
   selectedFamilyMembers,
   action,
   onConfirm,
+  isAdminStaff,
 }) => {
   const [validated, setValidated] = useState(false);
-  console.log("studentId", selectedFamilyMembers);
 
   const handleConfirm = () => {
     setValidated(true);
@@ -41,7 +42,11 @@ const CustomModal: React.FC<CustomModalProps> = ({
         </Form>
       </Modal.Body>
       <Modal.Footer>
-        <Button variant="primary" onClick={handleConfirm}>
+        <Button
+          variant="primary"
+          onClick={handleConfirm}
+          disabled={isAdminStaff && !!selectedFamilyMembers?._id}
+        >
           {action === "add" ? "Update" : "Add"}
         </Button>
         <Button variant="secondary" onClick={closeModal}>

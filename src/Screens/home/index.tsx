@@ -7,12 +7,10 @@ import moment from "moment";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { BASE_URL } from "../../configuration/config";
-import { Relationship } from "../../constants/enum";
+import { Relationship, Gender, UserRole } from "../../constants/enum";
 import { FamilyMember, Country, Student } from "../../interface/types";
 import { get, del, post, put } from "../../helpers/apiHelper";
-import { ToastContainer, toast } from 'react-toastify';
-
-
+import { ToastContainer, toast } from "react-toastify";
 
 function Home() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -37,6 +35,9 @@ function Home() {
   const [submittedFamilyMembers, setSubmittedFamilyMembers] = useState<
     FamilyMember[]
   >([]);
+
+  const isAdminStaff = selectedRole === "Admin Staff";
+  const isUser = selectedRole === "User";
 
   const resetForm = () => {
     setFormData({
@@ -67,7 +68,7 @@ function Home() {
   const closeModal = () => {
     setModalOpen(false);
     setSelectedStudent(null);
-    resetForm();
+    // resetForm();
   };
 
   useEffect(() => {
@@ -203,16 +204,15 @@ function Home() {
           return response.data;
         })
       );
-      
+
       fetchFamilyMembers(studentId);
       setSubmittedFamilyMembers(updatedFamilyMembers);
       fetchData();
       closeModal();
-      toast.success('Student details member Updated successfully!');
+      toast.success("Student details member Updated successfully!");
     } catch (error) {
-     console.error("Error updating student:", error);
-     toast.error("Error updating student:" + error);
-
+      console.error("Error updating student:", error);
+      toast.error("Error updating student:" + error);
     }
   };
 
@@ -240,7 +240,7 @@ function Home() {
         `/students/${studentId}/FamilyMembers`,
         submittedFamilyMembers
       );
-      toast.success('Student details added successfully!');
+      toast.success("Student details added successfully!");
       fetchData();
       closeModal();
     } catch (error) {
@@ -301,7 +301,9 @@ function Home() {
         setSubmittedFamilyMembers([...submittedFamilyMembers, newFamilyMember]);
         setShowFamilyMemberForm(true);
       } else {
-        toast.error("Please fill in all required fields for the family member.");
+        toast.error(
+          "Please fill in all required fields for the family member."
+        );
       }
     }
   };
@@ -344,7 +346,7 @@ function Home() {
 
   const renderFamilyMembers = () => {
     return (
-      <>
+      <div>
         <Table striped bordered hover responsive>
           {submittedFamilyMembers && submittedFamilyMembers.length > 0 && (
             <thead>
@@ -362,9 +364,11 @@ function Home() {
             {submittedFamilyMembers.map((familyMember, index) => (
               <tr key={index} style={{ cursor: "pointer" }}>
                 <td>{index + 1}</td>
-                <td className="text-truncate">{familyMember.name}</td>
-                <td className="text-truncate">{familyMember.relation}</td>
-                <td className="text-truncate">
+                <td className="text-truncate truncate">{familyMember.name}</td>
+                <td className="text-truncate truncate">
+                  {familyMember.relation}
+                </td>
+                <td className="text-truncate truncate">
                   {countries.find(
                     (country) => country._id === familyMember.nationalityId
                   )?.countryName || ""}
@@ -376,6 +380,7 @@ function Home() {
                     onClick={() =>
                       handleDeleteFamilyMember(index, familyMember._id)
                     }
+                    disabled={isAdminStaff && !!formData._id}
                   >
                     <FontAwesomeIcon icon={faTrash} />
                   </Button>
@@ -385,6 +390,7 @@ function Home() {
                     type="checkbox"
                     checked={selectedFamilyMemberIndex === index}
                     onChange={() => handleRowClick(index)}
+                    disabled={isAdminStaff && !!formData._id}
                   />
                 </td>
               </tr>
@@ -409,6 +415,7 @@ function Home() {
               }
               className="mb-2"
               required
+              disabled={isAdminStaff && !!formData._id}
             />
             <Form.Control
               as="select"
@@ -425,6 +432,7 @@ function Home() {
               }
               className="mb-2"
               required
+              disabled={isAdminStaff && !!formData._id}
             >
               <option value="">Select relationship</option>
               {Object.values(Relationship).map((relation) => (
@@ -448,6 +456,7 @@ function Home() {
               }
               className="mb-2"
               required
+              disabled={isAdminStaff && !!formData._id}
             >
               <option value="Select nationality" disabled>
                 Select nationality
@@ -468,12 +477,12 @@ function Home() {
           </div>
         )}
 
-        {showFamilyMemberForm && (
-          <Button variant="success" size="sm" onClick={handleAddFamilyMember}>
+        {!formData._id && showFamilyMemberForm &&(
+          <Button variant="success" size="sm" onClick={handleAddFamilyMember} >
             Add Family Member
           </Button>
         )}
-      </>
+      </div>
     );
   };
 
@@ -536,9 +545,30 @@ function Home() {
     },
   ];
 
+  // Custom styles for DataTable
+  const customStyles = {
+    table: {
+      style: {
+        border: "1px solid grey",
+      },
+    },
+    headCells: {
+      style: {
+        backgroundColor: "black",
+        color: "white",
+        border: "1px solid white",
+      },
+      rows: {
+        style: {
+          borderBottom: "1px solid red",
+        },
+      },
+    },
+  };
+
   return (
     <>
-     <ToastContainer />
+      <ToastContainer />
       <div
         style={{
           display: "flex",
@@ -547,7 +577,7 @@ function Home() {
           margin: "10px",
         }}
       >
-        <h2>List of Students</h2>
+        <h2>Registration Application</h2>
         <div
           style={{
             display: "flex",
@@ -556,14 +586,16 @@ function Home() {
           }}
         >
           <Form.Select
-            variant="success"
+            //variant="success"
             value={selectedRole}
-            onChange={(e) => handleRoleChange(e.target.value)}
+            onChange={(e) => handleRoleChange(e.target.value as UserRole)}
             id="dropdown-basic"
           >
-            <option value="User">User</option>
-            <option value="Staff">Admin Staff</option>
-            <option value="Registrar">Registrar</option>
+            {Object.values(UserRole).map((role) => (
+              <option key={role} value={role}>
+                {role}
+              </option>
+            ))}
           </Form.Select>
           {selectedRole !== "User" && (
             <button
@@ -579,13 +611,14 @@ function Home() {
       </div>
       <div style={{ padding: "0px 20px" }}>
         <DataTable
-          title="Student Data"
+          title="Student Information"
           columns={columns}
           data={students}
           pagination
-          paginationPerPage={5}
-          paginationRowsPerPageOptions={[5, 10, 20, 50]}
-          onRowClicked={(row) => editModal(row._id)}
+          paginationPerPage={10}
+          paginationRowsPerPageOptions={[10, 20, 50]}
+          onRowClicked={(row) => !isUser && editModal(row._id)}
+          customStyles={customStyles}
         />
       </div>
       <CustomModal
@@ -594,6 +627,8 @@ function Home() {
         title={selectedStudent ? "Add Student" : "Update Student"}
         onConfirm={handleConfirmAction}
         action={selectedStudent ? "update" : "add"}
+        isAdminStaff={isAdminStaff}
+        selectedFamilyMembers={formData}
       >
         <Form.Group controlId="formFirstName">
           <Form.Label>First Name</Form.Label>
@@ -605,6 +640,7 @@ function Home() {
               setFormData({ ...formData, firstName: e.target.value })
             }
             required
+            disabled={isAdminStaff && !!formData._id}
           />
         </Form.Group>
 
@@ -618,6 +654,7 @@ function Home() {
               setFormData({ ...formData, lastName: e.target.value })
             }
             required
+            disabled={isAdminStaff && !!formData._id}
           />
         </Form.Group>
 
@@ -630,11 +667,14 @@ function Home() {
               setFormData({ ...formData, gender: e.target.value })
             }
             required
+            disabled={isAdminStaff && !!formData._id}
           >
             <option value="">Select gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
+            {Object.values(Gender).map((gender) => (
+              <option key={gender} value={gender}>
+                {gender.charAt(0).toUpperCase() + gender.slice(1)}
+              </option>
+            ))}
           </Form.Control>
         </Form.Group>
 
@@ -651,6 +691,7 @@ function Home() {
             isClearable
             placeholderText="Select a date"
             customInput={<Form.Control style={{ width: "465px" }} />}
+            disabled={isAdminStaff && !!formData._id}
           />
         </Form.Group>
 
@@ -663,6 +704,7 @@ function Home() {
               setFormData({ ...formData, nationalityId: e.target.value })
             }
             required
+            disabled={isAdminStaff && !!formData._id}
           >
             <option value="Select nationality" disabled>
               Select nationality

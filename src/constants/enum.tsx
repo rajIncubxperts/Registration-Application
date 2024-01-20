@@ -5,3 +5,15 @@ export enum Relationship {
     Sibling = "Sibling",
   }
   
+  export enum Gender {
+    Male = "male",
+    Female = "female",
+    Other = "other",
+  }
+  
+  export enum UserRole {
+    User = "User",
+    Staff = "Admin Staff",
+    Registrar = "Registrar",
+  }
+  
